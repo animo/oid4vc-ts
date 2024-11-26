@@ -1,5 +1,17 @@
 # @animo-id/oid4vci
 
+## 0.2.0
+
+### Minor Changes
+
+- 0f60387: feat: add key attestations
+
+### Patch Changes
+
+- Updated dependencies [0f60387]
+  - @animo-id/oauth2@0.2.0
+  - @animo-id/oauth2-utils@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes

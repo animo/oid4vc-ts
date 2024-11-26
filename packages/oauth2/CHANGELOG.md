@@ -1,5 +1,15 @@
 # @animo-id/oauth2
 
+## 0.2.0
+
+### Minor Changes
+
+- 0f60387: feat: add client attestations
+
+### Patch Changes
+
+- @animo-id/oauth2-utils@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes
