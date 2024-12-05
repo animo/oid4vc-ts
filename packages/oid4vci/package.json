@@ -23,6 +23,7 @@
   "dependencies": {
     "@animo-id/oauth2": "workspace:*",
     "@animo-id/oauth2-utils": "workspace:*",
+    "@openid-federation/core": "0.1.1-alpha.18",
     "valibot": "^0.42.1"
   },
   "devDependencies": {

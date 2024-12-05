@@ -48,6 +48,9 @@ importers:
       '@animo-id/oauth2-utils':
         specifier: workspace:*
         version: link:../utils
+      '@openid-federation/core':
+        specifier: 0.1.1-alpha.18
+        version: 0.1.1-alpha.18
       valibot:
         specifier: ^0.42.1
         version: 0.42.1(typescript@5.6.3)
@@ -542,6 +545,9 @@ packages:
 
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
+
+  '@openid-federation/core@0.1.1-alpha.18':
+    resolution: {integrity: sha512-KtsC6peYIhxuMl7J2srttEzp8XTP8btBHKOshak1J/5R2PZvVawobiS51KeAcyZNTTpDtGrt9j5NQh0tpuJH2g==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1555,6 +1561,9 @@ packages:
     resolution: {integrity: sha512-cYVsTjKl8b+FrnidjibDWskAv7UKOfcwaVZdp/it9n1s9fU3IkgDbhdIRKCW4JDsAlECJY0ytoVPT3sK6kideA==}
     engines: {node: '>=18'}
 
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+
 snapshots:
 
   '@babel/runtime@7.25.7':
@@ -1989,6 +1998,11 @@ snapshots:
       outvariant: 1.4.3
 
   '@open-draft/until@2.1.0': {}
+
+  '@openid-federation/core@0.1.1-alpha.18':
+    dependencies:
+      buffer: 6.0.3
+      zod: 3.23.8
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -2925,3 +2939,5 @@ snapshots:
       yargs-parser: 21.1.1
 
   yoctocolors-cjs@2.1.2: {}
+
+  zod@3.23.8: {}

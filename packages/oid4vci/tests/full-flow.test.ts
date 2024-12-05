@@ -149,6 +149,9 @@ describe('Full E2E test', () => {
       http.get('https://oid4vc-ts-issuer.com/offers/1f9f284a-3b37-4d92-adb4-6339c9b7ca68', () =>
         HttpResponse.json(createdCredentialOffer.credentialOfferObject)
       ),
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-federation`, () =>
+        HttpResponse.text(undefined, { status: 404 })
+      ),
       http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, () =>
         HttpResponse.json(credentialIssuerMetadata)
       ),
@@ -440,6 +443,9 @@ describe('Full E2E test', () => {
     server.resetHandlers(
       http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-credential-issuer`, () =>
         HttpResponse.json(credentialIssuerMetadata)
+      ),
+      http.get(`${credentialIssuerMetadata.credential_issuer}/.well-known/openid-federation`, () =>
+        HttpResponse.text(undefined, { status: 404 })
       ),
       http.get(`${authorizationServerMetadata.issuer}/.well-known/openid-configuration`, () =>
         HttpResponse.text(undefined, { status: 404 })

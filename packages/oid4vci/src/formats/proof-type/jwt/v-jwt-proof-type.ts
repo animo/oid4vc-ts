@@ -22,7 +22,10 @@ export const vCredentialRequestJwtProofTypeHeader = v.pipe(
     ({ kid, jwk }) => jwk === undefined || kid === undefined,
     `Both 'jwk' and 'kid' are defined. Only one is allowed`
   ),
-  v.check(({ trust_chain, kid }) => !trust_chain || !kid, `When 'trust_chain' is provided, 'kid' is required`)
+  v.check(
+    ({ trust_chain, kid }) => !trust_chain || kid !== undefined,
+    `When 'trust_chain' is provided, 'kid' is required`
+  )
 )
 export type CredentialRequestJwtProofTypeHeader = v.InferOutput<typeof vCredentialRequestJwtProofTypeHeader>
 

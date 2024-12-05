@@ -46,7 +46,7 @@ export interface Oid4vciClientOptions {
   /**
    * Callbacks required for the oid4vc client
    */
-  callbacks: Omit<CallbackContext, 'verifyJwt' | 'clientAuthentication'>
+  callbacks: Omit<CallbackContext, 'clientAuthentication'>
 }
 
 export class Oid4vciClient {
@@ -76,7 +76,7 @@ export class Oid4vciClient {
 
   public async resolveIssuerMetadata(credentialIssuer: string): Promise<IssuerMetadataResult> {
     return resolveIssuerMetadata(credentialIssuer, {
-      fetch: this.options.callbacks.fetch,
+      callbackContext: this.options.callbacks,
     })
   }
 

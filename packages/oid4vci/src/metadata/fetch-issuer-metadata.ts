@@ -1,10 +1,10 @@
 import {
   type AuthorizationServerMetadata,
+  type CallbackContext,
   Oauth2Error,
   fetchAuthorizationServerMetadata,
   vAuthorizationServerMetadata,
 } from '@animo-id/oauth2'
-import type { Fetch } from '@animo-id/oauth2-utils'
 import { parseWithErrorHandling } from '@animo-id/oauth2-utils'
 import type { Oid4vciDraftVersion } from '../version'
 import { fetchCredentialIssuerMetadata } from './credential-issuer/credential-issuer-metadata'
@@ -27,10 +27,7 @@ export interface ResolveIssuerMetadataOptions {
    */
   allowAuthorizationMetadataFromCredentialIssuerMetadata?: boolean
 
-  /**
-   * Custom fetch implementation to use
-   */
-  fetch?: Fetch
+  callbackContext: Pick<CallbackContext, 'fetch' | 'verifyJwt' | 'signJwt'>
 }
 
 export interface IssuerMetadataResult {
@@ -41,12 +38,14 @@ export interface IssuerMetadataResult {
 
 export async function resolveIssuerMetadata(
   credentialIssuer: string,
-  options?: ResolveIssuerMetadataOptions
+  options: ResolveIssuerMetadataOptions
 ): Promise<IssuerMetadataResult> {
   const allowAuthorizationMetadataFromCredentialIssuerMetadata =
     options?.allowAuthorizationMetadataFromCredentialIssuerMetadata ?? true
 
-  const credentialIssuerMetadataWithDraftVersion = await fetchCredentialIssuerMetadata(credentialIssuer, options?.fetch)
+  const credentialIssuerMetadataWithDraftVersion = await fetchCredentialIssuerMetadata(credentialIssuer, {
+    callbackContext: options.callbackContext,
+  })
   if (!credentialIssuerMetadataWithDraftVersion) {
     throw new Oauth2Error(`Well known credential issuer metadata for issuer '${credentialIssuer}' not found.`)
   }
@@ -56,7 +55,7 @@ export async function resolveIssuerMetadata(
   // If no authoriation servers are defined, use the credential issuer as the authorization server
   const authorizationServers = credentialIssuerMetadata.authorization_servers ?? [credentialIssuer]
 
-  const authoriationServersMetadata: AuthorizationServerMetadata[] = []
+  const authorizationServersMetadata: AuthorizationServerMetadata[] = []
   for (const authorizationServer of authorizationServers) {
     if (
       options?.restrictToAuthorizationServers &&
@@ -65,7 +64,10 @@ export async function resolveIssuerMetadata(
       continue
     }
 
-    let authorizationServerMetadata = await fetchAuthorizationServerMetadata(authorizationServer, options?.fetch)
+    let authorizationServerMetadata = await fetchAuthorizationServerMetadata(
+      authorizationServer,
+      options.callbackContext.fetch
+    )
     if (
       !authorizationServerMetadata &&
       authorizationServer === credentialIssuer &&
@@ -87,12 +89,12 @@ export async function resolveIssuerMetadata(
       )
     }
 
-    authoriationServersMetadata.push(authorizationServerMetadata)
+    authorizationServersMetadata.push(authorizationServerMetadata)
   }
 
   return {
     originalDraftVersion,
     credentialIssuer: credentialIssuerMetadata,
-    authorizationServers: authoriationServersMetadata,
+    authorizationServers: authorizationServersMetadata,
   }
 }

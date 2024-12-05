@@ -13,6 +13,7 @@
     "types:check": "tsc --noEmit",
     "style:check": "biome check --unsafe",
     "style:fix": "biome check --write --unsafe",
+    "validate": "pnpm types:check && pnpm style:check",
     "build": "pnpm -r build",
     "test": "vitest",
     "release": "pnpm build && pnpm changeset publish --no-git-tag",

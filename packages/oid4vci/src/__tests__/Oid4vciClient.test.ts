@@ -1,5 +1,12 @@
-import { decodeJwt, preAuthorizedCodeGrantIdentifier } from '@animo-id/oauth2'
-import { parseWithErrorHandling } from '@animo-id/oauth2-utils'
+import {
+  HashAlgorithm,
+  type Jwk,
+  calculateJwkThumbprint,
+  decodeJwt,
+  preAuthorizedCodeGrantIdentifier,
+} from '@animo-id/oauth2'
+import { decodeBase64, encodeToUtf8String, parseWithErrorHandling } from '@animo-id/oauth2-utils'
+import { createEntityConfiguration } from '@openid-federation/core'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
@@ -8,7 +15,7 @@ import { callbacks, getSignJwtCallback, parseXwwwFormUrlEncoded } from '../../..
 import { AuthorizationFlow, Oid4vciClient } from '../Oid4vciClient'
 import { extractScopesForCredentialConfigurationIds } from '../metadata/credential-issuer/credential-configurations'
 import { bdrDraft13 } from './__fixtures__/bdr'
-import { paradymDraft11, paradymDraft13 } from './__fixtures__/paradym'
+import { paradymDraft11, paradymDraft13, paradymDraft13Federation } from './__fixtures__/paradym'
 import { presentationDuringIssuance } from './__fixtures__/presentationDuringIssuance'
 
 const server = setupServer()
@@ -30,6 +37,9 @@ describe('Oid4vciClient', () => {
     server.resetHandlers(
       http.get(paradymDraft13.credentialOfferUri.replace('?raw=true', ''), () =>
         HttpResponse.json(paradymDraft13.credentialOfferObject)
+      ),
+      http.get(`${paradymDraft13.credentialOfferObject.credential_issuer}/.well-known/openid-federation`, () =>
+        HttpResponse.text(undefined, { status: 404 })
       ),
       http.get(`${paradymDraft13.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`, () =>
         HttpResponse.json(paradymDraft13.credentialIssuerMetadata)
@@ -131,6 +141,9 @@ describe('Oid4vciClient', () => {
     server.resetHandlers(
       http.get(paradymDraft11.credentialOfferUri.replace('?raw=true', ''), () =>
         HttpResponse.json(paradymDraft11.credentialOfferObject)
+      ),
+      http.get(`${paradymDraft11.credentialOfferObject.credential_issuer}/.well-known/openid-federation`, () =>
+        HttpResponse.text(undefined, { status: 404 })
       ),
       http.get(`${paradymDraft11.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`, () =>
         HttpResponse.json(paradymDraft11.credentialIssuerMetadata)
@@ -290,6 +303,9 @@ describe('Oid4vciClient', () => {
     server.resetHandlers(
       http.get(`${bdrDraft13.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`, () =>
         HttpResponse.json(bdrDraft13.credentialIssuerMetadata)
+      ),
+      http.get(`${bdrDraft13.credentialOfferObject.credential_issuer}/.well-known/openid-federation`, () =>
+        HttpResponse.text(undefined, { status: 404 })
       ),
       http.get(`${bdrDraft13.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`, () =>
         HttpResponse.text(undefined, { status: 404 })
@@ -502,6 +518,10 @@ describe('Oid4vciClient', () => {
         () => HttpResponse.json(presentationDuringIssuance.credentialIssuerMetadata)
       ),
       http.get(
+        `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-federation`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
         `${presentationDuringIssuance.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
         () => HttpResponse.text(undefined, { status: 404 })
       ),
@@ -662,5 +682,178 @@ describe('Oid4vciClient', () => {
       },
     })
     expect(credentialResponse.credentialResponse).toStrictEqual(presentationDuringIssuance.credentialResponse)
+  })
+
+  test('receive a credential from Paradym using federation', async () => {
+    const { d, ...publicKeyJwk } = paradymDraft13Federation.holderPrivateKeyJwk
+    const jwtSigner = getSignJwtCallback([paradymDraft13Federation.holderPrivateKeyJwk])
+    const jwkKid = await calculateJwkThumbprint({
+      hashAlgorithm: HashAlgorithm.Sha256,
+      hashCallback: callbacks.hash,
+      jwk: paradymDraft13Federation.holderPrivateKeyJwk,
+    })
+
+    const entityConfigurationJwt = await createEntityConfiguration({
+      signJwtCallback: async ({ jwk, toBeSigned }) => {
+        const toBeSignedString = encodeToUtf8String(toBeSigned)
+        const [header, payload] = toBeSignedString.split('.')
+
+        const headerObject = JSON.parse(encodeToUtf8String(decodeBase64(header)))
+        const payloadObject = JSON.parse(encodeToUtf8String(decodeBase64(payload)))
+
+        const signed = await jwtSigner(
+          { publicJwk: jwk as Jwk, alg: 'ES256', method: 'jwk' },
+          {
+            header: headerObject,
+            payload: payloadObject,
+          }
+        )
+
+        const [, , signature] = signed.jwt.split('.')
+
+        return decodeBase64(signature)
+      },
+      header: {
+        kid: jwkKid,
+        alg: 'ES256',
+        typ: 'entity-statement+jwt',
+      },
+      claims: {
+        exp: new Date(new Date().getTime() + 1000 * 60 * 60 * 24).getTime(),
+        iat: new Date().getTime(),
+        sub: paradymDraft13Federation.credentialIssuerMetadata.credential_issuer,
+        iss: paradymDraft13Federation.credentialIssuerMetadata.credential_issuer,
+        jwks: {
+          keys: [
+            {
+              ...publicKeyJwk,
+              alg: 'ES256',
+              kid: jwkKid,
+            },
+          ],
+        },
+        metadata: {
+          federation_entity: paradymDraft13Federation.federationEntity,
+          openid_provider: {
+            ...paradymDraft13Federation.credentialIssuerMetadata,
+            client_registration_types_supported: ['automatic'],
+          },
+        },
+      },
+    })
+
+    server.resetHandlers(
+      http.get(paradymDraft13Federation.credentialOfferUri.replace('?raw=true', ''), () =>
+        HttpResponse.json(paradymDraft13Federation.credentialOfferObject)
+      ),
+      http.get(
+        `${paradymDraft13Federation.credentialOfferObject.credential_issuer}/.well-known/openid-federation`,
+        () =>
+          HttpResponse.text(entityConfigurationJwt, {
+            headers: {
+              'Content-Type': 'application/entity-statement+jwt',
+            },
+          })
+      ),
+      http.get(
+        `${paradymDraft13Federation.credentialOfferObject.credential_issuer}/.well-known/openid-credential-issuer`,
+        () => HttpResponse.json(paradymDraft13Federation.credentialIssuerMetadata)
+      ),
+      http.get(
+        `${paradymDraft13Federation.credentialOfferObject.credential_issuer}/.well-known/openid-configuration`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.get(
+        `${paradymDraft13Federation.credentialOfferObject.credential_issuer}/.well-known/oauth-authorization-server`,
+        () => HttpResponse.text(undefined, { status: 404 })
+      ),
+      http.post(paradymDraft13Federation.credentialIssuerMetadata.token_endpoint, async ({ request }) => {
+        expect(parseXwwwFormUrlEncoded(await request.text())).toEqual({
+          'pre-authorized_code': '1130293840889780123292078',
+          grant_type: preAuthorizedCodeGrantIdentifier,
+          resource: credentialOffer.credential_issuer,
+        })
+
+        return HttpResponse.json(paradymDraft13Federation.accessTokenResponse)
+      }),
+      http.post(paradymDraft13Federation.credentialIssuerMetadata.credential_endpoint, async ({ request }) => {
+        expect(await request.json()).toEqual({
+          format: 'vc+sd-jwt',
+          vct: 'https://metadata.paradym.id/types/6fTEgFULv2-EmployeeBadge',
+          proof: {
+            proof_type: 'jwt',
+            jwt: expect.any(String),
+          },
+        })
+        return HttpResponse.json(paradymDraft13Federation.credentialResponse)
+      })
+    )
+
+    const client = new Oid4vciClient({
+      callbacks: {
+        ...callbacks,
+        fetch,
+        signJwt: jwtSigner,
+      },
+    })
+
+    const credentialOffer = await client.resolveCredentialOffer(paradymDraft13Federation.credentialOffer)
+    expect(credentialOffer).toStrictEqual(paradymDraft13Federation.credentialOfferObject)
+
+    const issuerMetadata = await client.resolveIssuerMetadata(credentialOffer.credential_issuer)
+    expect(issuerMetadata.credentialIssuer).toStrictEqual({
+      ...paradymDraft13Federation.credentialIssuerMetadata,
+      client_registration_types_supported: ['automatic'],
+    })
+
+    const { accessTokenResponse, authorizationServer } = await client.retrievePreAuthorizedCodeAccessTokenFromOffer({
+      credentialOffer,
+      issuerMetadata,
+    })
+    expect(accessTokenResponse).toStrictEqual(paradymDraft13Federation.accessTokenResponse)
+    expect(authorizationServer).toStrictEqual(paradymDraft13Federation.credentialIssuerMetadata.credential_issuer)
+
+    const encodedJwk = Buffer.from(JSON.stringify(publicKeyJwk)).toString('base64url')
+    const didUrl = `did:jwk:${encodedJwk}#0`
+
+    // This is the holder side that will create a proof of possession of the private key
+    const { jwt: proofJwt } = await client.createCredentialRequestJwtProof({
+      issuerMetadata,
+      signer: {
+        alg: 'ES256',
+        method: 'did',
+        didUrl,
+      },
+      issuedAt: new Date('2024-10-10'),
+      credentialConfigurationId: credentialOffer.credential_configuration_ids[0],
+      nonce: accessTokenResponse.c_nonce,
+    })
+    expect(proofJwt).toMatch(
+      'eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0Iiwia2lkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW5naU9pSkJSVmh3U0hreE1FZG9kRmRvYkZaUVRtMXlSbk5pZVhSZmQwUnpVVjgzY1ROa2FrNXVjbWg2YWw4MElpd2llU0k2SWtSSFZFRkRUMEZCYmxGVVpYQmhSRFF3WjNsSE9WcHNMVzlFYUU5c2RqTlZRbXhVZEhoSlpYSTFaVzhpTENKamNuWWlPaUpRTFRJMU5pSjkjMCJ9.eyJhdWQiOiJodHRwczovL2FnZW50LnBhcmFkeW0uaWQvb2lkNHZjaS9kcmFmdC0xMy1pc3N1ZXIiLCJpYXQiOjE3Mjg1MTg0MDAsIm5vbmNlIjoiNDYzMjUzOTE3MDk0ODY5MTcyMDc4MzEwIn0.'
+    )
+    expect(decodeJwt({ jwt: proofJwt })).toStrictEqual({
+      header: {
+        alg: 'ES256',
+        kid: 'did:jwk:eyJrdHkiOiJFQyIsIngiOiJBRVhwSHkxMEdodFdobFZQTm1yRnNieXRfd0RzUV83cTNkak5ucmh6al80IiwieSI6IkRHVEFDT0FBblFUZXBhRDQwZ3lHOVpsLW9EaE9sdjNVQmxUdHhJZXI1ZW8iLCJjcnYiOiJQLTI1NiJ9#0',
+        typ: 'openid4vci-proof+jwt',
+      },
+      payload: {
+        aud: 'https://agent.paradym.id/oid4vci/draft-13-issuer',
+        iat: 1728518400,
+        nonce: '463253917094869172078310',
+      },
+      signature: expect.any(String),
+    })
+
+    const credentialResponse = await client.retrieveCredentials({
+      accessToken: accessTokenResponse.access_token,
+      credentialConfigurationId: credentialOffer.credential_configuration_ids[0],
+      issuerMetadata,
+      proof: {
+        proof_type: 'jwt',
+        jwt: proofJwt,
+      },
+    })
+    expect(credentialResponse.credentialResponse).toStrictEqual(paradymDraft13Federation.credentialResponse)
   })
 })
