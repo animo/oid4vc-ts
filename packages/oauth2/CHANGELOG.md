@@ -1,5 +1,15 @@
 # @openid4vc/oauth2
 
+## 0.2.0
+
+### Minor Changes
+
+- 0f60387: feat: add client attestations
+
+### Patch Changes
+
+- @openid4vc/utils@0.2.0
+
 ## 0.1.4
 
 ### Patch Changes
