@@ -1,6 +1,6 @@
 {
   "name": "@openid4vc/oid4vci",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "exports": "./src/index.ts",
   "files": ["dist"],
   "license": "Apache-2.0",
